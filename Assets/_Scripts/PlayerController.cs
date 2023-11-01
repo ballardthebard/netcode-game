@@ -4,32 +4,28 @@ using UnityEngine;
 
 public class PlayerController : NetworkBehaviour
 {
-    [SerializeField] private Transform groundCheck;
-    [SerializeField] private LayerMask groundLayer;
-
-    [SerializeField] private float moveSpeed = 5.0f;
-    [SerializeField] private float maxVelocity = 5.0f;
-    [SerializeField] private float rotationSpeed = 10.0f;
-    [SerializeField] private float jumpForce = 8.0f;
-    [SerializeField] private float jumpDelay = 1.0f;
-    [SerializeField] private float jumpCooldown = 1.0f;
-    [SerializeField] private float fallThreshold = -0.1f;
+    private IMovement movement;
+    private IJump jump;
+    private IGrab grab;
 
     private Rigidbody rb;
     private Animator animator;
 
-    private float jumpDelayTimer;
-    private float jumpCooldownTimer;
-
-    private bool isGrounded;
-    private bool canJump = true;
-    private bool isJumping = false;
-    private bool isFalling = false;
-
     private void Initialize()
     {
+        // Get components
         rb = GetComponent<Rigidbody>();
         animator = GetComponent<Animator>();
+
+        // Get strategies
+        movement = GetComponentInChildren<IMovement>();
+        jump = GetComponentInChildren<IJump>();
+        grab = GetComponentInChildren<IGrab>();
+
+        // Set strategies properties
+        movement.Rigidbody = rb;
+        jump.Rigidbody = rb;
+        jump.Animator = animator;
     }
 
     public override void OnNetworkSpawn()
@@ -42,73 +38,29 @@ public class PlayerController : NetworkBehaviour
     {
         if (!IsOwner || !Application.isFocused) return;
 
-        // Check if the player is grounded
-        isGrounded = Physics.CheckSphere(groundCheck.position, 0.2f, groundLayer);
-
         float horizontalInput = Input.GetAxis("Horizontal");
         float verticalInput = Input.GetAxis("Vertical");
 
         // Calculate the movement direction
-        Vector3 movement = new Vector3(horizontalInput, 0.0f, verticalInput);
+        Vector3 movementAxis = new Vector3(horizontalInput, 0.0f, verticalInput);
 
-        // Normalize the movement direction if not zero
-        if (movement != Vector3.zero)
+        movement.Move(movementAxis);
+        movement.Rotate(movementAxis);
+
+        if (Input.GetButtonDown("Jump"))
         {
-            Quaternion targetRotation = Quaternion.LookRotation(movement);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            jump.Jump();
         }
 
-        // Apply force for movement
-        rb.AddForce(movement * moveSpeed);
-
-        // Limit the maximum velocity
-        if (rb.velocity.magnitude > maxVelocity)
+        if (Input.GetKeyDown(KeyCode.F))
         {
-            rb.velocity = rb.velocity.normalized * maxVelocity;
+            grab.IsGrabbing = true;
+            animator.SetBool("Grab", true);
         }
-
-        // Check if the player is falling
-        if (rb.velocity.y < fallThreshold)
+        else if (Input.GetKeyUp(KeyCode.F))
         {
-            animator.SetBool("Jump", false);
-            animator.SetBool("Land", false);
-            animator.SetBool("Fall", true);
-            isFalling = true;
-        }
-
-        // Grounded 
-        if (isGrounded)
-        {
-            if (isFalling)
-            {
-                animator.SetBool("Fall", false);
-                animator.SetBool("Land", true);
-            }
-
-            // Cooldown control
-            if (!canJump && Time.time - jumpCooldownTimer >= jumpCooldown)
-            {
-                canJump = true;
-            }
-
-            // Jump control
-            if (Input.GetButtonDown("Jump") && canJump)
-            {
-                animator.SetBool("Jump", true);
-
-                jumpCooldownTimer = Time.time;
-                jumpDelayTimer = Time.time;
-
-                canJump = false;
-                isJumping = true;
-            }
-
-            // Delayed jump
-            if (isJumping && Time.time - jumpDelayTimer >= jumpDelay)
-            {
-                rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
-                isJumping = false;
-            }
+            grab.IsGrabbing = false;
+            animator.SetBool("Grab", false);
         }
     }
 }
