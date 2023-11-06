@@ -5,40 +5,48 @@ using UnityEngine;
 public class Grab : MonoBehaviour, IGrab
 {
     [SerializeField] private float grabSpeed;
-    [SerializeField] private float grabTrashold = 0.5f;
+    [SerializeField] private float grabTrashold = 0.75f;
 
     private bool isGrabbing;
-    private Rigidbody grabbableRigidbody;
+    private Dictionary<int, Grabbable> grabbables;
+    private PlayerController playerController;
 
+    // Properties
     public bool IsGrabbing { set => isGrabbing = value; }
+    public PlayerController PlayerController { set => playerController = value; }
+
+    private void Start()
+    {
+        grabbables = new Dictionary<int, Grabbable>();
+    }
 
     private void OnTriggerStay(Collider other)
     {
         if (other.tag != "Grabbable" || !isGrabbing) return;
 
-        if (grabbableRigidbody == null)
+        int key = other.GetHashCode();
+
+        if (!grabbables.ContainsKey(key))
         {
-            grabbableRigidbody = other.GetComponent<Rigidbody>();
+            grabbables.Add(key, other.GetComponent<Grabbable>());
         }
 
-        Vector3 direction = transform.position - other.transform.position;
-        grabbableRigidbody.AddForce(direction * grabSpeed);
+        Vector3 direction = transform.position - grabbables[key].transform.position;
+        grabbables[key].Rigidbody.AddForce(direction * grabSpeed);
 
-        print(Vector3.Distance(other.transform.position, transform.position));
-
-        if (Vector3.Distance(other.transform.position, transform.position) < grabTrashold)
+        if (Vector3.Distance(grabbables[key].transform.position, transform.position) < grabTrashold + grabbables[key].GrabTrashold)
         {
-            other.gameObject.SetActive(false);
+            playerController.ChangeBodies(grabbables[key]);
+            Debug.Log("Changed Bodie");
         }
-
     }
 
     void IGrab.Grab()
     {
         isGrabbing = true;
     }
+
     public void Discard()
     {
-
     }
 }

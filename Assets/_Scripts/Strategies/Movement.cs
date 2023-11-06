@@ -5,23 +5,29 @@ using UnityEngine;
 public class Movement : MonoBehaviour, IMovement
 {
     // Variables
-    [SerializeField] private float moveSpeed;
+    [SerializeField] private float moveSpeed = 6f;
     [SerializeField] private float maxVelocity;
     [SerializeField] private float rotationSpeed;
 
     private Rigidbody rb;
 
-    public Rigidbody Rigidbody { set => rb = value; }
+    private void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+    }
 
     public void Move(Vector3 movementAxis)
     {
+        Debug.Log(movementAxis);
         // Apply force for movement
-        rb.AddForce(movementAxis * moveSpeed);
+        rb.AddForce(movementAxis * moveSpeed, ForceMode.Acceleration);
 
         // Limit the maximum velocity
         if (rb.velocity.magnitude > maxVelocity)
         {
-            rb.velocity = rb.velocity.normalized * maxVelocity;
+            Vector3 velocity = rb.velocity.normalized * maxVelocity;
+            velocity.y = rb.velocity.y;
+            rb.velocity = velocity;
         }
     }
 

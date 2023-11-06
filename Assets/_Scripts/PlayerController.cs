@@ -1,31 +1,37 @@
-using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.XR;
 
 public class PlayerController : NetworkBehaviour
 {
+    [SerializeField] private Transform eyesTransform;
+    [SerializeField] private Grabbable defaultBody;
+
+    // Variables
     private IMovement movement;
-    private IJump jump;
+    private ISpecial special;
     private IGrab grab;
 
-    private Rigidbody rb;
     private Animator animator;
+
+    private bool hasBody;
+
+    // Properties
+    public IMovement Movement { set => movement = value; }
+    public ISpecial Special { set => special = value; }
 
     private void Initialize()
     {
         // Get components
-        rb = GetComponent<Rigidbody>();
-        animator = GetComponent<Animator>();
+        animator = GetComponentInChildren<Animator>();
 
         // Get strategies
         movement = GetComponentInChildren<IMovement>();
-        jump = GetComponentInChildren<IJump>();
+        special = GetComponentInChildren<ISpecial>();
         grab = GetComponentInChildren<IGrab>();
 
         // Set strategies properties
-        movement.Rigidbody = rb;
-        jump.Rigidbody = rb;
-        jump.Animator = animator;
+        grab.PlayerController = this;
     }
 
     public override void OnNetworkSpawn()
@@ -42,25 +48,42 @@ public class PlayerController : NetworkBehaviour
         float verticalInput = Input.GetAxis("Vertical");
 
         // Calculate the movement direction
-        Vector3 movementAxis = new Vector3(horizontalInput, 0.0f, verticalInput);
-
+        Vector3 movementAxis = new Vector3(horizontalInput, 0.0f, verticalInput).normalized;
         movement.Move(movementAxis);
         movement.Rotate(movementAxis);
 
         if (Input.GetButtonDown("Jump"))
         {
-            jump.Jump();
+            special.Special();
         }
 
-        if (Input.GetKeyDown(KeyCode.F))
+        if (Input.GetKeyDown(KeyCode.Mouse0))
         {
             grab.IsGrabbing = true;
             animator.SetBool("Grab", true);
         }
-        else if (Input.GetKeyUp(KeyCode.F))
+        else if (Input.GetKeyUp(KeyCode.Mouse0))
         {
             grab.IsGrabbing = false;
+            grab.Discard();
             animator.SetBool("Grab", false);
         }
+    }
+
+    public void ChangeBodies(Grabbable bodie)
+    {
+        // Disable default bodie and set bool as has body
+        hasBody = true;
+        defaultBody.gameObject.SetActive(false);
+
+        bodie.Rigidbody.freezeRotation = true;
+        bodie.transform.localPosition = defaultBody.transform.localPosition;
+        bodie.transform.localRotation = defaultBody.transform.rotation;
+        eyesTransform.localPosition = bodie.EyesTransform.localPosition;
+
+        // Set new strategies
+        movement = bodie.Movement;
+        special = bodie.Special;
+        special.Enable(true);
     }
 }

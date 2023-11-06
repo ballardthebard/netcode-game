@@ -1,14 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 
-public class Jump : MonoBehaviour, IJump
+public class Jump : MonoBehaviour, ISpecial
 {
     [SerializeField] private Transform groundCheck;
     [SerializeField] private LayerMask groundLayer;
 
-    [SerializeField] private float fallSpeed = 2.0f;
     [SerializeField] private float jumpForce = 8.0f;
+    [SerializeField] private float maxJumpHeight = 2.0f;
+    [SerializeField] private float fallSpeed = 2.0f;
     [SerializeField] private float jumpDelay = 1.0f;
     [SerializeField] private float jumpCooldown = 1.0f;
     [SerializeField] private float fallThreshold = -0.1f;
@@ -16,6 +18,7 @@ public class Jump : MonoBehaviour, IJump
     private Rigidbody rb;
     private Animator animator;
 
+    private float startHeight;
     private float jumpDelayTimer;
     private float jumpCooldownTimer;
 
@@ -24,10 +27,13 @@ public class Jump : MonoBehaviour, IJump
     private bool isJumping = false;
     private bool isFalling = false;
 
-    public Rigidbody Rigidbody { set => rb = value; }
-    public Animator Animator { set => animator = value; }
+    private void Start()
+    {
+        rb = GetComponent<Rigidbody>();
+        animator = GetComponent<Animator>();
+    }
 
-    private void Update()
+    private void FixedUpdate()
     {
         // Check if the player is grounded
         isGrounded = Physics.CheckSphere(groundCheck.position, 0.2f, groundLayer);
@@ -35,7 +41,7 @@ public class Jump : MonoBehaviour, IJump
         // Check if the player is falling
         if (rb.velocity.y < fallThreshold)
         {
-            // Apply force for movement
+            // Apply fall speed
             rb.AddForce(Vector3.down * fallSpeed);
 
             if (!isFalling)
@@ -45,6 +51,14 @@ public class Jump : MonoBehaviour, IJump
                 animator.SetBool("Fall", true);
                 isFalling = true;
             }
+        }
+
+        if (transform.position.y - startHeight > maxJumpHeight)
+        {
+            rb.velocity = new Vector3(rb.velocity.x, 0, rb.velocity.z);
+
+            // Apply fall speed
+            rb.AddForce(Vector3.down * fallSpeed);
         }
 
         // Grounded 
@@ -66,13 +80,14 @@ public class Jump : MonoBehaviour, IJump
             // Delayed jump
             if (isJumping && Time.time - jumpDelayTimer >= jumpDelay)
             {
+                startHeight = transform.position.y;
                 rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
                 isJumping = false;
             }
         }
     }
 
-    void IJump.Jump()
+    void ISpecial.Special()
     {
         // Jump control
         if (canJump)
@@ -85,5 +100,10 @@ public class Jump : MonoBehaviour, IJump
             canJump = false;
             isJumping = true;
         }
+    }
+
+    void ISpecial.Enable(bool enabled)
+    {
+        this.enabled = enabled;
     }
 }
